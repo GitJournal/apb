@@ -1,4 +1,4 @@
-module github.com/vhanda/apks
+module github.com/GitJournal/apb
 
 go 1.17
 
