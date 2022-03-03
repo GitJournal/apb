@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -43,11 +44,11 @@ func main() {
 	if len(rsp3.Releases) != 1 {
 		log.Fatal("Should have received one response")
 	}
-	r := rsp3.Releases[0]
-	if len(r.VersionCodes) != 1 {
-		log.Fatal("Should have received only one version code")
-	}
-	vc := r.VersionCodes[0]
+	release := rsp3.Releases[0]
 
-	fmt.Println(vc)
+	json, err := json.MarshalIndent(release, "", "  ")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(json))
 }
