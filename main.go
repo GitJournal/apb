@@ -43,8 +43,36 @@ func main() {
 			{
 				Name:  "trackInfo",
 				Usage: "Display Info about a track",
-				Action: func(c *cli.Context) error {
-					return trackInfo(c.Context, pkg, credsFile)
+				Subcommands: []*cli.Command{
+					{
+						Name:    "production",
+						Aliases: []string{"p"},
+						Action: func(c *cli.Context) error {
+							return trackInfo(c.Context, pkg, credsFile, c.Command.Name)
+						},
+					},
+					{
+						Name:    "alpha",
+						Aliases: []string{"a"},
+						Action: func(c *cli.Context) error {
+							return trackInfo(c.Context, pkg, credsFile, c.Command.Name)
+						},
+					},
+					{
+						Name:    "beta",
+						Aliases: []string{"b"},
+						Action: func(c *cli.Context) error {
+							return trackInfo(c.Context, pkg, credsFile, c.Command.Name)
+						},
+					},
+					{
+						Name:    "list",
+						Usage:   "List all the tracks",
+						Aliases: []string{"l"},
+						Action: func(c *cli.Context) error {
+							return listTracks(c.Context, pkg, credsFile)
+						},
+					},
 				},
 			},
 		},
@@ -56,21 +84,38 @@ func main() {
 	}
 }
 
-func trackInfo(ctx context.Context, pkg string, credsFile string) error {
+func buildService(ctx context.Context, pkg string, credsFile string) (*androidpublisher.Service, string, error) {
 	androidpublisherService, err := androidpublisher.NewService(ctx, option.WithCredentialsFile(credsFile))
 	if err != nil {
-		return err
+		return nil, "", err
 	}
 
 	var appEdit androidpublisher.AppEdit
 	editCreate := androidpublisherService.Edits.Insert(pkg, &appEdit)
 	editCreateRsp, err := editCreate.Do()
 	if err != nil {
+		return nil, "", err
+	}
+	return androidpublisherService, editCreateRsp.Id, nil
+}
+
+func marshallAndPrint(v interface{}) error {
+	json, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
 		return err
 	}
-	editId := editCreateRsp.Id
 
-	c := androidpublisherService.Edits.Tracks.Get(pkg, editId, "production")
+	fmt.Println(string(json))
+	return nil
+}
+
+func trackInfo(ctx context.Context, pkg string, credsFile string, track string) error {
+	service, editId, err := buildService(ctx, pkg, credsFile)
+	if err != nil {
+		return err
+	}
+
+	c := service.Edits.Tracks.Get(pkg, editId, track)
 	rsp, err := c.Do()
 	if err != nil {
 		return err
@@ -79,13 +124,24 @@ func trackInfo(ctx context.Context, pkg string, credsFile string) error {
 	if len(rsp.Releases) != 1 {
 		log.Fatal("Should have received one response")
 	}
-	release := rsp.Releases[0]
+	return marshallAndPrint(rsp.Releases[0])
+}
 
-	json, err := json.MarshalIndent(release, "", "  ")
+func listTracks(ctx context.Context, pkg string, credsFile string) error {
+	service, editId, err := buildService(ctx, pkg, credsFile)
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(json))
 
-	return nil
+	c := service.Edits.Tracks.List(pkg, editId)
+	rsp, err := c.Do()
+	if err != nil {
+		return err
+	}
+
+	trackNames := []string{}
+	for _, track := range rsp.Tracks {
+		trackNames = append(trackNames, track.Track)
+	}
+	return marshallAndPrint(trackNames)
 }
